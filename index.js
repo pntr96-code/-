@@ -64,7 +64,7 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
     logChannel.send({ embeds: [embed] });
 });
 
-// 2. الحركة الصوتية (الانضمام، المغادرة، النقل بواسطة مشرف)
+// 2. الحركة الصوتية مع التمييز الدقيق بين الانتقال الذاتي والسحب بواسطة مشرف
 client.on('voiceStateUpdate', async (oldState, newState) => {
     const logChannel = newState.guild.channels.cache.get(CHANNELS.CHANNELS);
     if (!logChannel) return;
@@ -75,7 +75,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     if (oldState.channelId !== newState.channelId) {
         let actionText = '';
         let color = '#3498DB';
-        let movedBy = 'نفسه (انتقل بنفسه)';
+        let movedBy = 'نفسه';
 
         if (!oldState.channelId && newState.channelId) {
             actionText = `انضم إلى الروم الصوتي: ${newState.channel.name}`;
@@ -87,15 +87,16 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
             actionText = `انتقل من روم ${oldState.channel.name} إلى ${newState.channel.name}`;
             color = '#F39C12';
 
-            // التحقق عما إذا كان مشرف آخر قد قام بسحبه
             try {
                 const fetchedLogs = await newState.guild.fetchAuditLogs({
                     limit: 1,
                     type: AuditLogEvent.MemberMove,
                 });
                 const auditLog = fetchedLogs.entries.first();
-                if (auditLog && auditLog.target.id === member.id && (Date.now() - auditLog.createdTimestamp < 3000)) {
-                    movedBy = `${auditLog.executor.tag} (<@${auditLog.executor.id}>)`;
+                if (auditLog && auditLog.target.id === member.id && (Date.now() - auditLog.createdTimestamp < 4000)) {
+                    if (auditLog.executor.id !== member.id) {
+                        movedBy = `${auditLog.executor.tag} (<@${auditLog.executor.id}>)`;
+                    }
                 }
             } catch (e) {
                 console.error(e);
@@ -117,7 +118,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     }
 });
 
-// 3. الميوت والدفن الصوتي (تبقى في روم الميوت MUTE_VOICE)
+// 3. الميوت والدفن الصوتي
 client.on('voiceStateUpdate', async (oldState, newState) => {
     const logChannel = newState.guild.channels.cache.get(CHANNELS.MUTE_VOICE);
     if (!logChannel) return;
