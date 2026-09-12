@@ -64,7 +64,7 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
     logChannel.send({ embeds: [embed] });
 });
 
-// 2. الحركة الصوتية (عرض خانة المسؤول عن النقل دائماً مع المنشن الصحيح)
+// 2. الحركة الصوتية (عرض خانة المسؤول عن النقل دائماً مثل الميوت)
 client.on('voiceStateUpdate', async (oldState, newState) => {
     const logChannel = newState.guild.channels.cache.get(CHANNELS.CHANNELS);
     if (!logChannel) return;
@@ -75,7 +75,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     if (oldState.channelId !== newState.channelId) {
         let actionText = '';
         let color = '#3498DB';
-        let movedBy = `<@${member.id}>`; // افتراضياً منشن العضو نفسه إذا انتقل بنفسه
+        let executor = `<@${member.id}>`; // افتراضياً منشن العضو نفسه إذا انتقل بنفسه
 
         if (!oldState.channelId && newState.channelId) {
             actionText = `انضم إلى الروم الصوتي: ${newState.channel.name}`;
@@ -97,7 +97,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
                 const auditLog = fetchedLogs.entries.first();
                 if (auditLog && auditLog.target && auditLog.target.id === member.id && (Date.now() - auditLog.createdTimestamp < 5000)) {
                     if (auditLog.executor && auditLog.executor.id !== member.id) {
-                        movedBy = `<@${auditLog.executor.id}>`; // منشن المشرف إذا سحبه شخص آخر
+                        executor = `<@${auditLog.executor.id}>`; // منشن المشرف إذا سحبه شخص ثانٍ
                     }
                 }
             } catch (e) {
@@ -112,7 +112,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
             .addFields(
                 { name: '👤 العضو', value: `${member.user.tag} (<@${member.id}>)`, inline: false },
                 { name: '📍 التفاصيل', value: actionText, inline: false },
-                { name: '🛡️ المسؤول عن النقل', value: movedBy, inline: false }
+                { name: '🛡️ المسؤول عن النقل', value: executor, inline: false }
             )
             .setTimestamp();
 
@@ -136,7 +136,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
         if (newState.serverDeaf) status += ' | كتم الصوت عنه (Deafened)';
         else if (!newState.serverDeaf && oldState.serverDeaf) status += ' | فك الكتم عنه';
 
-        let executor = 'غير معروف';
+        let executor = `<@${member.id}>`;
         try {
             const fetchedLogs = await newState.guild.fetchAuditLogs({
                 limit: 1,
