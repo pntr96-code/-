@@ -11,32 +11,32 @@ const client = new Client({
     ]
 });
 
-// الآديهات الخاصة بالرومات
 const CHANNELS = {
-    MODERATION: '763446019119251466', // الباند، الكيك، والتايم أوت
-    MUTE_VOICE: '763446086819774484', // الميوت (الصوتي/الكتابي) والدَفن
-    MESSAGES:   '763421646836858891', // الرسائل (حذف وتعديل)
-    CHANNELS:   '763445919130583091', // الرومات (إنشاء وحذف وتعديل)
-    ROLES:      '763444458565009460'  // الرولات (إنشاء وحذف وتعديل)
+    MODERATION: '763446019119251466',
+    MUTE_VOICE: '763446086819774484',
+    MESSAGES:   '763421646836858891',
+    CHANNELS:   '763445919130583091',
+    ROLES:      '763444458565009460'
 };
 
 client.once('ready', () => {
     console.log(`Logged in as ${client.user.tag}!`);
 });
 
-// --- 1. قسم الرسائل (حذف وتعديل) ---
+// 1. الرسائل (حذف وتعديل)
 client.on('messageDelete', async (message) => {
     if (message.partial || message.author?.bot) return;
     const logChannel = message.guild.channels.cache.get(CHANNELS.MESSAGES);
     if (!logChannel) return;
 
     const embed = new EmbedBuilder()
-        .setColor('#FF0000')
-        .setTitle('🗑️ حذف رسالة')
+        .setColor('#FF3333')
+        .setAuthor({ name: '𝐂𝐚𝐦𝐨𝐫𝐚 𝐋𝐨𝐠 - حذف رسالة', iconURL: message.guild.iconURL({ dynamic: true }) })
+        .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
         .addFields(
-            { name: 'المستخدم', value: `${message.author.tag} (<@${message.author.id}>)`, inline: true },
-            { name: 'القناة', value: `${message.channel}`, inline: true },
-            { name: 'المحتوى', value: message.content || '*فقط مرفقات / بدون نص*' }
+            { name: '👤 المستخدم', value: `${message.author.tag} (<@${message.author.id}>)`, inline: false },
+            { name: '📁 القناة', value: `${message.channel}`, inline: false },
+            { name: '💬 المحتوى', value: message.content || '*فقط مرفقات / بدون نص*', inline: false }
         )
         .setTimestamp();
 
@@ -50,81 +50,67 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
 
     const embed = new EmbedBuilder()
         .setColor('#FFA500')
-        .setTitle('✏️ تعديل رسالة')
+        .setAuthor({ name: '𝐂𝐚𝐦𝐨𝐫𝐚 𝐋𝐨𝐠 - تعديل رسالة', iconURL: oldMessage.guild.iconURL({ dynamic: true }) })
+        .setThumbnail(oldMessage.author.displayAvatarURL({ dynamic: true }))
         .addFields(
-            { name: 'المستخدم', value: `${oldMessage.author.tag} (<@${oldMessage.author.id}>)`, inline: true },
-            { name: 'القناة', value: `${oldMessage.channel}`, inline: true },
-            { name: 'قبل التعديل', value: oldMessage.content || '*فارغ*' },
-            { name: 'بعد التعديل', value: newMessage.content || '*فارغ*' }
+            { name: '👤 المستخدم', value: `${oldMessage.author.tag} (<@${oldMessage.author.id}>)`, inline: false },
+            { name: '📁 القناة', value: `${oldMessage.channel}`, inline: false },
+            { name: '📝 قبل التعديل', value: oldMessage.content || '*فارغ*', inline: false },
+            { name: '✨ بعد التعديل', value: newMessage.content || '*فارغ*', inline: false }
         )
         .setTimestamp();
 
     logChannel.send({ embeds: [embed] });
 });
 
-// --- 2. قسم العقوبات (Kick, Ban, Timeout) ---
+// 2. العقوبات (Kick, Ban, Timeout)
 client.on('guildAuditLogEntryCreate', async (auditLog, guild) => {
-    const { action, executor, target, changes } = auditLog;
-    const logChannel = guild.channels.cache.get(CHANNELS.MODERATION);
-    if (!logChannel) return;
+    try {
+        const { action, executor, target } = auditLog;
+        const logChannel = guild.channels.cache.get(CHANNELS.MODERATION);
+        if (!logChannel) return;
 
-    // حالة الطرد (Kick)
-    if (action === AuditLogEvent.MemberKick && target) {
-        const embed = new EmbedBuilder()
-            .setColor('#FF4500')
-            .setTitle('👢 طرد عضو (Kick)')
-            .addFields(
-                { name: 'العضو', value: `${target.tag} (<@${target.id}>)`, inline: true },
-                { name: 'المشرف', value: `${executor ? executor.tag : 'غير معروف'}`, inline: true }
-            )
-            .setTimestamp();
-        return logChannel.send({ embeds: [embed] });
-    }
-
-    // حالة الباند (Ban)
-    if (action === AuditLogEvent.MemberBanAdd && target) {
-        const embed = new EmbedBuilder()
-            .setColor('#8B0000')
-            .setTitle('🔨 حظر عضو (Ban)')
-            .addFields(
-                { name: 'العضو', value: `${target.tag} (<@${target.id}>)`, inline: true },
-                { name: 'المشرف', value: `${executor ? executor.tag : 'غير معروف'}`, inline: true }
-            )
-            .setTimestamp();
-        return logChannel.send({ embeds: [embed] });
-    }
-
-    // حالة التايم أوت (Timeout / Communication Disabled)
-    if (action === AuditLogEvent.MemberUpdate && target) {
-        const timeoutChange = changes.find(c => c.key === 'communication_disabled_until');
-        if (timeoutChange) {
-            const isMuted = timeoutChange.new !== null;
+        if (action === AuditLogEvent.MemberKick && target) {
             const embed = new EmbedBuilder()
-                .setColor(isMuted ? '#FFD700' : '#00FF00')
-                .setTitle(isMuted ? '⏳ إعطاء تايم أوت (Timeout)' : '🔓 إزالة التايم أوت')
+                .setColor('#FF4500')
+                .setAuthor({ name: '𝐂𝐚𝐦𝐨𝐫𝐚 𝐋𝐨𝐠 - طرد عضو', iconURL: guild.iconURL({ dynamic: true }) })
+                .setThumbnail(target.displayAvatarURL({ dynamic: true }))
                 .addFields(
-                    { name: 'العضو', value: `${target.tag} (<@${target.id}>)`, inline: true },
-                    { name: 'المشرف', value: `${executor ? executor.tag : 'غير معروف'}`, inline: true }
+                    { name: '👤 العضو المطرود', value: `${target.tag} (<@${target.id}>)`, inline: false },
+                    { name: '🛡️ المشرف المسؤول', value: `${executor ? `${executor.tag} (<@${executor.id}>)` : 'غير معروف'}`, inline: false }
                 )
                 .setTimestamp();
-            
-            const muteChannel = guild.channels.cache.get(CHANNELS.MUTE_VOICE);
-            if (muteChannel) muteChannel.send({ embeds: [embed] });
+            return logChannel.send({ embeds: [embed] });
         }
+
+        if (action === AuditLogEvent.MemberBanAdd && target) {
+            const embed = new EmbedBuilder()
+                .setColor('#8B0000')
+                .setAuthor({ name: '𝐂𝐚𝐦𝐨𝐫𝐚 𝐋𝐨𝐠 - حظر عضو', iconURL: guild.iconURL({ dynamic: true }) })
+                .setThumbnail(target.displayAvatarURL({ dynamic: true }))
+                .addFields(
+                    { name: '👤 العضو المحظور', value: `${target.tag} (<@${target.id}>)`, inline: false },
+                    { name: '🛡️ المشرف المسؤول', value: `${executor ? `${executor.tag} (<@${executor.id}>)` : 'غير معروف'}`, inline: false }
+                )
+                .setTimestamp();
+            return logChannel.send({ embeds: [embed] });
+        }
+    } catch (err) {
+        console.error(err);
     }
 });
 
-// --- 3. قسم الرومات (Channels) ---
+// 3. الرومات
 client.on('channelCreate', (channel) => {
     const logChannel = channel.guild.channels.cache.get(CHANNELS.CHANNELS);
     if (!logChannel) return;
 
     const embed = new EmbedBuilder()
         .setColor('#00FF7F')
-        .setTitle('📁 إنشاء قناة جديدة')
+        .setAuthor({ name: '𝐂𝐚𝐦𝐨𝐫𝐚 𝐋𝐨𝐠 - إنشاء قناة', iconURL: channel.guild.iconURL({ dynamic: true }) })
         .addFields(
-            { name: 'اسم القناة', value: `${channel.name}`, inline: true },
-            { name: 'النوع', value: `${channel.type}`, inline: true }
+            { name: '📁 اسم القناة', value: `${channel.name}`, inline: true },
+            { name: '📌 النوع', value: `${channel.type}`, inline: true }
         )
         .setTimestamp();
     logChannel.send({ embeds: [embed] });
@@ -136,24 +122,24 @@ client.on('channelDelete', (channel) => {
 
     const embed = new EmbedBuilder()
         .setColor('#DC143C')
-        .setTitle('🗑️ حذف قناة')
+        .setAuthor({ name: '𝐂𝐚𝐦𝐨𝐫𝐚 𝐋𝐨𝐠 - حذف قناة', iconURL: channel.guild.iconURL({ dynamic: true }) })
         .addFields(
-            { name: 'اسم القناة', value: `${channel.name}`, inline: true }
+            { name: '📁 اسم القناة', value: `${channel.name}`, inline: true }
         )
         .setTimestamp();
     logChannel.send({ embeds: [embed] });
 });
 
-// --- 4. قسم الرولات (Roles) ---
+// 4. الرولات
 client.on('roleCreate', (role) => {
     const logChannel = role.guild.channels.cache.get(CHANNELS.ROLES);
     if (!logChannel) return;
 
     const embed = new EmbedBuilder()
         .setColor('#1E90FF')
-        .setTitle('✨ إنشاء رتبة جديدة')
+        .setAuthor({ name: '𝐂𝐚𝐦𝐨𝐫𝐚 𝐋𝐨𝐠 - إنشاء رتبة', iconURL: role.guild.iconURL({ dynamic: true }) })
         .addFields(
-            { name: 'اسم الرتبة', value: `${role.name}`, inline: true }
+            { name: '✨ اسم الرتبة', value: `${role.name}`, inline: true }
         )
         .setTimestamp();
     logChannel.send({ embeds: [embed] });
@@ -165,9 +151,9 @@ client.on('roleDelete', (role) => {
 
     const embed = new EmbedBuilder()
         .setColor('#B22222')
-        .setTitle('🗑️ حذف رتبة')
+        .setAuthor({ name: '𝐂𝐚𝐦𝐨𝐫𝐚 𝐋𝐨𝐠 - حذف رتبة', iconURL: role.guild.iconURL({ dynamic: true }) })
         .addFields(
-            { name: 'اسم الرتبة', value: `${role.name}`, inline: true }
+            { name: '✨ اسم الرتبة', value: `${role.name}`, inline: true }
         )
         .setTimestamp();
     logChannel.send({ embeds: [embed] });
