@@ -64,7 +64,7 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
     logChannel.send({ embeds: [embed] });
 });
 
-// 2. الحركة الصوتية الذكية (تلقط السحب بواسطة مشرف أو الانتقال الذاتي)
+// 2. الحركة الصوتية (بنفس منطق جلب المشرف في الميوت والكتم تماماً)
 client.on('voiceStateUpdate', async (oldState, newState) => {
     const logChannel = newState.guild.channels.cache.get(CHANNELS.CHANNELS);
     if (!logChannel) return;
@@ -75,7 +75,6 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     if (oldState.channelId !== newState.channelId) {
         let actionText = '';
         let color = '#3498DB';
-        let movedBy = `<@${member.id}>`; // الافتراضي أنه نقل نفسه
 
         if (!oldState.channelId && newState.channelId) {
             actionText = `انضم إلى الروم الصوتي: ${newState.channel.name}`;
@@ -86,24 +85,21 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
         } else if (oldState.channelId && newState.channelId) {
             actionText = `انتقل من روم ${oldState.channel.name} إلى ${newState.channel.name}`;
             color = '#F39C12';
+        }
 
-            // انتظار تسجيل الحدث في سجل ديسكورد للتحقق هل سحبه مشرف آخر؟
-            await new Promise(resolve => setTimeout(resolve, 800));
-
-            try {
-                const fetchedLogs = await newState.guild.fetchAuditLogs({
-                    limit: 3,
-                    type: AuditLogEvent.MemberMove,
-                });
-                const auditLog = fetchedLogs.entries.first();
-                if (auditLog && auditLog.target && auditLog.target.id === member.id && (Date.now() - auditLog.createdTimestamp < 6000)) {
-                    if (auditLog.executor) {
-                        movedBy = `<@${auditLog.executor.id}>`; // منشن الشخص الحقيقي الذي قام بنقله (سواء أنت أو غيرك)
-                    }
-                }
-            } catch (e) {
-                console.error(e);
+        // جلب المشرف المسؤول بنفس طريقة الميوت والكتم تماماً
+        let executor = `<@${member.id}>`;
+        try {
+            const fetchedLogs = await newState.guild.fetchAuditLogs({
+                limit: 1,
+                type: AuditLogEvent.MemberMove,
+            });
+            const auditLog = fetchedLogs.entries.first();
+            if (auditLog && auditLog.target && auditLog.target.id === member.id && auditLog.executor) {
+                executor = `<@${auditLog.executor.id}>`;
             }
+        } catch (e) {
+            console.error(e);
         }
 
         const embed = new EmbedBuilder()
@@ -113,7 +109,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
             .addFields(
                 { name: '👤 العضو', value: `${member.user.tag} (<@${member.id}>)`, inline: false },
                 { name: '📍 التفاصيل', value: actionText, inline: false },
-                { name: '🛡️ المسؤول عن النقل', value: movedBy, inline: false }
+                { name: '🛡️ المسؤول عن النقل', value: executor, inline: false }
             )
             .setTimestamp();
 
@@ -378,6 +374,3 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 });
 
 client.login(process.env.TOKEN);
-
-
-
