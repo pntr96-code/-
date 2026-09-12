@@ -75,7 +75,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     if (oldState.channelId !== newState.channelId) {
         let actionText = '';
         let color = '#3498DB';
-        let movedBy = 'نفسه';
+        let movedBy = `<@${member.id}>`; // افتراضياً العضو نفسه إذا لم يسحبه أحد
 
         if (!oldState.channelId && newState.channelId) {
             actionText = `انضم إلى الروم الصوتي: ${newState.channel.name}`;
@@ -95,7 +95,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
                 const auditLog = fetchedLogs.entries.first();
                 if (auditLog && auditLog.target && auditLog.target.id === member.id && (Date.now() - auditLog.createdTimestamp < 4000)) {
                     if (auditLog.executor && auditLog.executor.id !== member.id) {
-                        movedBy = `<@${auditLog.executor.id}>`;
+                        movedBy = `<@${auditLog.executor.id}>`; // إذا شخص ثانٍ سحبه، يتم وضع منشن المشرف الحقيقي
                     }
                 }
             } catch (e) {
@@ -134,7 +134,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
         if (newState.serverDeaf) status += ' | كتم الصوت عنه (Deafened)';
         else if (!newState.serverDeaf && oldState.serverDeaf) status += ' | فك الكتم عنه';
 
-        let executor = 'غير معروف';
+        let executor = `<@${member.id}>`;
         try {
             const fetchedLogs = await newState.guild.fetchAuditLogs({
                 limit: 1,
@@ -330,7 +330,7 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
     const removedRoles = oldRoles.filter(role => !newRoles.has(role.id));
 
     if (addedRoles.size > 0 || removedRoles.size > 0) {
-        let executor = 'غير معروف';
+        let executor = `<@${newMember.id}>`;
         try {
             const fetchedLogs = await newMember.guild.fetchAuditLogs({
                 limit: 1,
