@@ -1,4 +1,5 @@
 const { Client, GatewayIntentBits, EmbedBuilder, AuditLogEvent } = require('discord.js');
+const { joinVoiceChannel } = require('@discordjs/voice');
 require('dotenv').config();
 
 const client = new Client({
@@ -20,8 +21,30 @@ const CHANNELS = {
     ROLES:      '763444458565009460'
 };
 
-client.once('ready', () => {
+// آيدي الروم الصوتي الخاص بالبوت
+const BOT_VOICE_CHANNEL_ID = '1383608547022995496';
+
+client.once('ready', async () => {
     console.log(`Logged in as ${client.user.tag}!`);
+
+    // إدخال البوت للروم الصوتي الخاص والبقاء فيه
+    if (BOT_VOICE_CHANNEL_ID) {
+        try {
+            const channel = await client.channels.fetch(BOT_VOICE_CHANNEL_ID);
+            if (channel && channel.type === 2) {
+                joinVoiceChannel({
+                    channelId: channel.id,
+                    guildId: channel.guild.id,
+                    adapterCreator: channel.guild.voiceAdapterCreator,
+                    selfDeaf: true,
+                    selfMute: true
+                });
+                console.log(`Successfully joined voice channel: ${channel.name}`);
+            }
+        } catch (error) {
+            console.error('Failed to join the voice channel:', error);
+        }
+    }
 });
 
 // 1. الرسائل (حذف وتعديل)
@@ -64,7 +87,7 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
     logChannel.send({ embeds: [embed] });
 });
 
-// 2. الحركة الصوتية (بنفس منطق جلب المشرف في الميوت والكتم تماماً)
+// 2. الحركة الصوتية
 client.on('voiceStateUpdate', async (oldState, newState) => {
     const logChannel = newState.guild.channels.cache.get(CHANNELS.CHANNELS);
     if (!logChannel) return;
@@ -87,7 +110,6 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
             color = '#F39C12';
         }
 
-        // جلب المشرف المسؤول بنفس طريقة الميوت والكتم تماماً
         let executor = `<@${member.id}>`;
         try {
             const fetchedLogs = await newState.guild.fetchAuditLogs({
