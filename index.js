@@ -6,17 +6,18 @@ const client = new Client({
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildModeration,
+        GatewayIntentBits.GuildVoiceStates, // مهم جداً لرصد الحركة الصوتية (التنقل، الميوت الصوتي، الدفن)
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent
     ]
 });
 
 const CHANNELS = {
-    MODERATION: '763446019119251466',
-    MUTE_VOICE: '763446086819774484',
-    MESSAGES:   '763421646836858891',
-    CHANNELS:   '763445919130583091',
-    ROLES:      '763444458565009460'
+    MODERATION: '763446019119251466', // باند وكيك
+    MUTE_VOICE: '763446086819774484', // الميوت الصوتي والكتابي والدافن والدسكونكت
+    MESSAGES:   '763421646836858891', // الرسائل
+    CHANNELS:   '763445919130583091', // الرومات الكتابية/الصوتية
+    ROLES:      '763444458565009460'  // الرولات
 };
 
 client.once('ready', () => {
@@ -63,7 +64,67 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
     logChannel.send({ embeds: [embed] });
 });
 
-// 2. العقوبات (Kick, Ban, Timeout)
+// 2. تتبع الحركة الصوتية (الانتقال بين الرومات، الميوت الصوتي، الدفن، ديسكونكت)
+client.on('voiceStateUpdate', async (oldState, newState) => {
+    const logChannel = newState.guild.channels.cache.get(CHANNELS.MUTE_VOICE);
+    if (!logChannel) return;
+
+    const member = newState.member;
+    if (!member) return;
+
+    // أ) التنقل بين الرومات أو الدخول والخروج
+    if (oldState.channelId !== newState.channelId) {
+        let actionText = '';
+        let color = '#3498DB';
+
+        if (!oldState.channelId && newState.channelId) {
+            actionText = `📥 انضم إلى الروم الصوتي: **${newState.channel.name}**`;
+            color = '#2ECC71';
+        } else if (oldState.channelId && !newState.channelId) {
+            actionText = `📤 غادر الروم الصوتي: **${oldState.channel.name}**`;
+            color = '#E74C3C';
+        } else if (oldState.channelId && newState.channelId) {
+            actionText = `🔄 انتقل من روم **${oldState.channel.name}** إلى **${newState.channel.name}**`;
+            color = '#F39C12';
+        }
+
+        const embed = new EmbedBuilder()
+            .setColor(color)
+            .setAuthor({ name: '𝐂𝐚𝐦𝐨𝐫𝐚 𝐋𝐨𝐠 - حركة صوتية', iconURL: newState.guild.iconURL({ dynamic: true }) })
+            .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+            .addFields(
+                { name: '👤 العضو', value: `${member.user.tag} (<@${member.id}>)`, inline: false },
+                { name: '📍 التفاصيل', value: actionText, inline: false }
+            )
+            .setTimestamp();
+
+        return logChannel.send({ embeds: [embed] });
+    }
+
+    // ب) الميوت والدفن والفصل الصوتي بواسطة مشرف (Server Mute / Server Deaf)
+    if (oldState.serverMute !== newState.serverMute || oldState.serverDeaf !== newState.serverDeaf) {
+        let status = '';
+        if (newState.serverMute) status = '🔇 أعطاه ميوت صوتي (Server Mute)';
+        else if (!newState.serverMute && oldState.serverMute) status = '🔊 فك عنه الميوت الصوتي';
+
+        if (newState.serverDeaf) status += ' | 🔕 كتم الصوت عنه (Deafened)';
+        else if (!newState.serverDeaf && oldState.serverDeaf) status += ' | 🔔 فك الكتم عنه';
+
+        const embed = new EmbedBuilder()
+            .setColor('#9B59B6')
+            .setAuthor({ name: '𝐂𝐚𝐦𝐨𝐫𝐚 𝐋𝐨𝐠 - عقوبة صوتية', iconURL: newState.guild.iconURL({ dynamic: true }) })
+            .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+            .addFields(
+                { name: '👤 العضو', value: `${member.user.tag} (<@${member.id}>)`, inline: false },
+                { name: '⚙️ الحالة', value: status, inline: false }
+            )
+            .setTimestamp();
+
+        return logChannel.send({ embeds: [embed] });
+    }
+});
+
+// 3. العقوبات الإدارية (Kick, Ban)
 client.on('guildAuditLogEntryCreate', async (auditLog, guild) => {
     try {
         const { action, executor, target } = auditLog;
@@ -100,7 +161,7 @@ client.on('guildAuditLogEntryCreate', async (auditLog, guild) => {
     }
 });
 
-// 3. الرومات
+// 4. الرومات
 client.on('channelCreate', (channel) => {
     const logChannel = channel.guild.channels.cache.get(CHANNELS.CHANNELS);
     if (!logChannel) return;
@@ -130,7 +191,7 @@ client.on('channelDelete', (channel) => {
     logChannel.send({ embeds: [embed] });
 });
 
-// 4. الرولات
+// 5. الرولات
 client.on('roleCreate', (role) => {
     const logChannel = role.guild.channels.cache.get(CHANNELS.ROLES);
     if (!logChannel) return;
