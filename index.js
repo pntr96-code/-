@@ -64,7 +64,7 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
     logChannel.send({ embeds: [embed] });
 });
 
-// 2. الحركة الصوتية
+// 2. الحركة الصوتية مع انتظار السجل لضمان التقاط المشرف الحقيقي
 client.on('voiceStateUpdate', async (oldState, newState) => {
     const logChannel = newState.guild.channels.cache.get(CHANNELS.CHANNELS);
     if (!logChannel) return;
@@ -75,7 +75,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     if (oldState.channelId !== newState.channelId) {
         let actionText = '';
         let color = '#3498DB';
-        let movedBy = `<@${member.id}>`; // افتراضياً العضو نفسه إذا لم يسحبه أحد
+        let movedBy = `<@${member.id}>`; // افتراضياً العضو نفسه
 
         if (!oldState.channelId && newState.channelId) {
             actionText = `انضم إلى الروم الصوتي: ${newState.channel.name}`;
@@ -87,15 +87,18 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
             actionText = `انتقل من روم ${oldState.channel.name} إلى ${newState.channel.name}`;
             color = '#F39C12';
 
+            // الانتظار لمدة 500 ميلي ثانية لضمان كتابة الحدث في سجل ديسكورد
+            await new Promise(resolve => setTimeout(resolve, 500));
+
             try {
                 const fetchedLogs = await newState.guild.fetchAuditLogs({
-                    limit: 1,
+                    limit: 3,
                     type: AuditLogEvent.MemberMove,
                 });
                 const auditLog = fetchedLogs.entries.first();
-                if (auditLog && auditLog.target && auditLog.target.id === member.id && (Date.now() - auditLog.createdTimestamp < 4000)) {
+                if (auditLog && auditLog.target && auditLog.target.id === member.id && (Date.now() - auditLog.createdTimestamp < 5000)) {
                     if (auditLog.executor && auditLog.executor.id !== member.id) {
-                        movedBy = `<@${auditLog.executor.id}>`; // إذا شخص ثانٍ سحبه، يتم وضع منشن المشرف الحقيقي
+                        movedBy = `<@${auditLog.executor.id}>`; // المشرف الذي قام بسحبه
                     }
                 }
             } catch (e) {
