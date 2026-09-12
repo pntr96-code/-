@@ -64,7 +64,7 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
     logChannel.send({ embeds: [embed] });
 });
 
-// 2. الحركة الصوتية (مطابقة تماماً لعقوبات الميوت والكتم)
+// 2. الحركة الصوتية (عرض خانة المسؤول عن النقل دائماً مع المنشن الصحيح)
 client.on('voiceStateUpdate', async (oldState, newState) => {
     const logChannel = newState.guild.channels.cache.get(CHANNELS.CHANNELS);
     if (!logChannel) return;
@@ -75,7 +75,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     if (oldState.channelId !== newState.channelId) {
         let actionText = '';
         let color = '#3498DB';
-        let executor = null; // مبدئياً فارغ إذا انتقل بنفسه
+        let movedBy = `<@${member.id}>`; // افتراضياً منشن العضو نفسه إذا انتقل بنفسه
 
         if (!oldState.channelId && newState.channelId) {
             actionText = `انضم إلى الروم الصوتي: ${newState.channel.name}`;
@@ -97,7 +97,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
                 const auditLog = fetchedLogs.entries.first();
                 if (auditLog && auditLog.target && auditLog.target.id === member.id && (Date.now() - auditLog.createdTimestamp < 5000)) {
                     if (auditLog.executor && auditLog.executor.id !== member.id) {
-                        executor = `<@${auditLog.executor.id}>`; // يظهر منشن المشرف فقط إذا سحبه شخص آخر
+                        movedBy = `<@${auditLog.executor.id}>`; // منشن المشرف إذا سحبه شخص آخر
                     }
                 }
             } catch (e) {
@@ -105,21 +105,15 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
             }
         }
 
-        const fields = [
-            { name: '👤 العضو', value: `${member.user.tag} (<@${member.id}>)`, inline: false },
-            { name: '📍 التفاصيل', value: actionText, inline: false }
-        ];
-
-        // إذا تم سحبه بواسطة مشرف، أضف حقل المشرف المسؤول مثل الميوت
-        if (executor) {
-            fields.push({ name: '🛡️ المشرف المسؤول', value: executor, inline: false });
-        }
-
         const embed = new EmbedBuilder()
             .setColor(color)
             .setAuthor({ name: '𝐂𝐚𝐦𝐨𝐫𝐚 𝐋𝐨𝐠 - حركة صوتية', iconURL: newState.guild.iconURL({ dynamic: true }) })
             .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-            .addFields(fields)
+            .addFields(
+                { name: '👤 العضو', value: `${member.user.tag} (<@${member.id}>)`, inline: false },
+                { name: '📍 التفاصيل', value: actionText, inline: false },
+                { name: '🛡️ المسؤول عن النقل', value: movedBy, inline: false }
+            )
             .setTimestamp();
 
         return logChannel.send({ embeds: [embed] });
