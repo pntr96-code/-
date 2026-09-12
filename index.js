@@ -6,18 +6,18 @@ const client = new Client({
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildModeration,
-        GatewayIntentBits.GuildVoiceStates, // مهم جداً لرصد الحركة الصوتية (التنقل، الميوت الصوتي، الدفن)
+        GatewayIntentBits.GuildVoiceStates,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent
     ]
 });
 
 const CHANNELS = {
-    MODERATION: '763446019119251466', // باند وكيك
-    MUTE_VOICE: '763446086819774484', // الميوت الصوتي والكتابي والدافن والدسكونكت
-    MESSAGES:   '763421646836858891', // الرسائل
-    CHANNELS:   '763445919130583091', // الرومات الكتابية/الصوتية
-    ROLES:      '763444458565009460'  // الرولات
+    MODERATION: '763446019119251466',
+    MUTE_VOICE: '763446086819774484',
+    MESSAGES:   '763421646836858891',
+    CHANNELS:   '763445919130583091',
+    ROLES:      '763444458565009460'
 };
 
 client.once('ready', () => {
@@ -64,7 +64,7 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
     logChannel.send({ embeds: [embed] });
 });
 
-// 2. تتبع الحركة الصوتية (الانتقال بين الرومات، الميوت الصوتي، الدفن، ديسكونكت)
+// 2. الحركة الصوتية والميوت مع جلب المشرف المسؤول
 client.on('voiceStateUpdate', async (oldState, newState) => {
     const logChannel = newState.guild.channels.cache.get(CHANNELS.MUTE_VOICE);
     if (!logChannel) return;
@@ -72,19 +72,18 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     const member = newState.member;
     if (!member) return;
 
-    // أ) التنقل بين الرومات أو الدخول والخروج
     if (oldState.channelId !== newState.channelId) {
         let actionText = '';
         let color = '#3498DB';
 
         if (!oldState.channelId && newState.channelId) {
-            actionText = `📥 انضم إلى الروم الصوتي: **${newState.channel.name}**`;
+            actionText = `انضم إلى الروم الصوتي: ${newState.channel.name}`;
             color = '#2ECC71';
         } else if (oldState.channelId && !newState.channelId) {
-            actionText = `📤 غادر الروم الصوتي: **${oldState.channel.name}**`;
+            actionText = `غادر الروم الصوتي: ${oldState.channel.name}`;
             color = '#E74C3C';
         } else if (oldState.channelId && newState.channelId) {
-            actionText = `🔄 انتقل من روم **${oldState.channel.name}** إلى **${newState.channel.name}**`;
+            actionText = `انتقل من روم ${oldState.channel.name} إلى ${newState.channel.name}`;
             color = '#F39C12';
         }
 
@@ -101,14 +100,27 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
         return logChannel.send({ embeds: [embed] });
     }
 
-    // ب) الميوت والدفن والفصل الصوتي بواسطة مشرف (Server Mute / Server Deaf)
     if (oldState.serverMute !== newState.serverMute || oldState.serverDeaf !== newState.serverDeaf) {
         let status = '';
-        if (newState.serverMute) status = '🔇 أعطاه ميوت صوتي (Server Mute)';
-        else if (!newState.serverMute && oldState.serverMute) status = '🔊 فك عنه الميوت الصوتي';
+        if (newState.serverMute) status = 'أعطاه ميوت صوتي (Server Mute)';
+        else if (!newState.serverMute && oldState.serverMute) status = 'فك عنه الميوت الصوتي';
 
-        if (newState.serverDeaf) status += ' | 🔕 كتم الصوت عنه (Deafened)';
-        else if (!newState.serverDeaf && oldState.serverDeaf) status += ' | 🔔 فك الكتم عنه';
+        if (newState.serverDeaf) status += ' | كتم الصوت عنه (Deafened)';
+        else if (!newState.serverDeaf && oldState.serverDeaf) status += ' | فك الكتم عنه';
+
+        let executor = 'غير معروف';
+        try {
+            const fetchedLogs = await newState.guild.fetchAuditLogs({
+                limit: 1,
+                type: AuditLogEvent.MemberUpdate,
+            });
+            const auditLog = fetchedLogs.entries.first();
+            if (auditLog && auditLog.target.id === member.id) {
+                executor = `${auditLog.executor.tag} (<@${auditLog.executor.id}>)`;
+            }
+        } catch (e) {
+            console.error(e);
+        }
 
         const embed = new EmbedBuilder()
             .setColor('#9B59B6')
@@ -116,7 +128,8 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
             .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
             .addFields(
                 { name: '👤 العضو', value: `${member.user.tag} (<@${member.id}>)`, inline: false },
-                { name: '⚙️ الحالة', value: status, inline: false }
+                { name: '⚙️ الحالة', value: status, inline: false },
+                { name: '🛡️ المشرف المسؤول', value: executor, inline: false }
             )
             .setTimestamp();
 
@@ -162,62 +175,180 @@ client.on('guildAuditLogEntryCreate', async (auditLog, guild) => {
 });
 
 // 4. الرومات
-client.on('channelCreate', (channel) => {
+client.on('channelCreate', async (channel) => {
     const logChannel = channel.guild.channels.cache.get(CHANNELS.CHANNELS);
     if (!logChannel) return;
+
+    let executor = 'غير معروف';
+    try {
+        const fetchedLogs = await channel.guild.fetchAuditLogs({
+            limit: 1,
+            type: AuditLogEvent.ChannelCreate,
+        });
+        const auditLog = fetchedLogs.entries.first();
+        if (auditLog) {
+            executor = `${auditLog.executor.tag} (<@${auditLog.executor.id}>)`;
+        }
+    } catch (e) {
+        console.error(e);
+    }
 
     const embed = new EmbedBuilder()
         .setColor('#00FF7F')
         .setAuthor({ name: '𝐂𝐚𝐦𝐨𝐫𝐚 𝐋𝐨𝐠 - إنشاء قناة', iconURL: channel.guild.iconURL({ dynamic: true }) })
         .addFields(
-            { name: '📁 اسم القناة', value: `${channel.name}`, inline: true },
-            { name: '📌 النوع', value: `${channel.type}`, inline: true }
+            { name: '📁 اسم القناة', value: `${channel.name}`, inline: false },
+            { name: '📌 النوع', value: `${channel.type}`, inline: false },
+            { name: '🛡️ المشرف المسؤول', value: executor, inline: false }
         )
         .setTimestamp();
     logChannel.send({ embeds: [embed] });
 });
 
-client.on('channelDelete', (channel) => {
+client.on('channelDelete', async (channel) => {
     const logChannel = channel.guild.channels.cache.get(CHANNELS.CHANNELS);
     if (!logChannel) return;
+
+    let executor = 'غير معروف';
+    try {
+        const fetchedLogs = await channel.guild.fetchAuditLogs({
+            limit: 1,
+            type: AuditLogEvent.ChannelDelete,
+        });
+        const auditLog = fetchedLogs.entries.first();
+        if (auditLog) {
+            executor = `${auditLog.executor.tag} (<@${auditLog.executor.id}>)`;
+        }
+    } catch (e) {
+        console.error(e);
+    }
 
     const embed = new EmbedBuilder()
         .setColor('#DC143C')
         .setAuthor({ name: '𝐂𝐚𝐦𝐨𝐫𝐚 𝐋𝐨𝐠 - حذف قناة', iconURL: channel.guild.iconURL({ dynamic: true }) })
         .addFields(
-            { name: '📁 اسم القناة', value: `${channel.name}`, inline: true }
+            { name: '📁 اسم القناة', value: `${channel.name}`, inline: false },
+            { name: '🛡️ المشرف المسؤول', value: executor, inline: false }
         )
         .setTimestamp();
     logChannel.send({ embeds: [embed] });
 });
 
-// 5. الرولات
-client.on('roleCreate', (role) => {
+// 5. الرولات (إنشاء، حذف، إعطاء رتبة، سحب رتبة)
+client.on('roleCreate', async (role) => {
     const logChannel = role.guild.channels.cache.get(CHANNELS.ROLES);
     if (!logChannel) return;
+
+    let executor = 'غير معروف';
+    try {
+        const fetchedLogs = await role.guild.fetchAuditLogs({
+            limit: 1,
+            type: AuditLogEvent.RoleCreate,
+        });
+        const auditLog = fetchedLogs.entries.first();
+        if (auditLog) {
+            executor = `${auditLog.executor.tag} (<@${auditLog.executor.id}>)`;
+        }
+    } catch (e) {
+        console.error(e);
+    }
 
     const embed = new EmbedBuilder()
         .setColor('#1E90FF')
         .setAuthor({ name: '𝐂𝐚𝐦𝐨𝐫𝐚 𝐋𝐨𝐠 - إنشاء رتبة', iconURL: role.guild.iconURL({ dynamic: true }) })
         .addFields(
-            { name: '✨ اسم الرتبة', value: `${role.name}`, inline: true }
+            { name: '✨ اسم الرتبة', value: `${role.name}`, inline: false },
+            { name: '🛡️ المشرف المسؤول', value: executor, inline: false }
         )
         .setTimestamp();
     logChannel.send({ embeds: [embed] });
 });
 
-client.on('roleDelete', (role) => {
+client.on('roleDelete', async (role) => {
     const logChannel = role.guild.channels.cache.get(CHANNELS.ROLES);
     if (!logChannel) return;
+
+    let executor = 'غير معروف';
+    try {
+        const fetchedLogs = await role.guild.fetchAuditLogs({
+            limit: 1,
+            type: AuditLogEvent.RoleDelete,
+        });
+        const auditLog = fetchedLogs.entries.first();
+        if (auditLog) {
+            executor = `${auditLog.executor.tag} (<@${auditLog.executor.id}>)`;
+        }
+    } catch (e) {
+        console.error(e);
+    }
 
     const embed = new EmbedBuilder()
         .setColor('#B22222')
         .setAuthor({ name: '𝐂𝐚𝐦𝐨𝐫𝐚 𝐋𝐨𝐠 - حذف رتبة', iconURL: role.guild.iconURL({ dynamic: true }) })
         .addFields(
-            { name: '✨ اسم الرتبة', value: `${role.name}`, inline: true }
+            { name: '✨ اسم الرتبة', value: `${role.name}`, inline: false },
+            { name: '🛡️ المشرف المسؤول', value: executor, inline: false }
         )
         .setTimestamp();
     logChannel.send({ embeds: [embed] });
+});
+
+// تتبع إعطاء وسحب الرولات للأعضاء
+client.on('guildMemberUpdate', async (oldMember, newMember) => {
+    const logChannel = newMember.guild.channels.cache.get(CHANNELS.ROLES);
+    if (!logChannel) return;
+
+    const oldRoles = oldMember.roles.cache;
+    const newRoles = newMember.roles.cache;
+
+    // التحقق من الرتب المضافة (إعطاء رتبة)
+    const addedRoles = newRoles.filter(role => !oldRoles.has(role.id));
+    // التحقق من الرتب المسحوبة (سحب رتبة)
+    const removedRoles = oldRoles.filter(role => !newRoles.has(role.id));
+
+    if (addedRoles.size > 0 || removedRoles.size > 0) {
+        let executor = 'غير معروف';
+        try {
+            const fetchedLogs = await newMember.guild.fetchAuditLogs({
+                limit: 1,
+                type: AuditLogEvent.MemberRoleUpdate,
+            });
+            const auditLog = fetchedLogs.entries.first();
+            if (auditLog && auditLog.target.id === newMember.id) {
+                executor = `${auditLog.executor.tag} (<@${auditLog.executor.id}>)`;
+            }
+        } catch (e) {
+            console.error(e);
+        }
+
+        addedRoles.forEach(role => {
+            const embed = new EmbedBuilder()
+                .setColor('#2ECC71')
+                .setAuthor({ name: '𝐂𝐚𝐦𝐨𝐫𝐚 𝐋𝐨𝐠 - إعطاء رتبة لعضو', iconURL: newMember.guild.iconURL({ dynamic: true }) })
+                .setThumbnail(newMember.user.displayAvatarURL({ dynamic: true }))
+                .addFields(
+                    { name: '👤 العضو', value: `${newMember.user.tag} (<@${newMember.id}>)`, inline: false },
+                    { name: '✨ الرتبة المعطاة', value: `${role.name}`, inline: false },
+                    { name: '🛡️ المشرف المسؤول', value: executor, inline: false }
+                )
+                .setTimestamp();
+            logChannel.send({ embeds: [embed] });
+        });
+
+        removedRoles.forEach(role => {
+            const embed = new EmbedBuilder()
+                .setColor('#E74C3C')
+                .setAuthor({ name: '𝐂𝐚𝐦𝐨𝐫𝐚 𝐋𝐨𝐠 - سحب رتبة من عضو', iconURL: newMember.guild.iconURL({ dynamic: true }) })
+                .setThumbnail(newMember.user.displayAvatarURL({ dynamic: true }))
+                .addFields(
+                    { name: '👤 العضو', value: `${newMember.user.tag} (<@${newMember.id}>)`, inline: false },
+                    { name: '✨ الرتبة المسحوبة', value: `${role.name}`, inline: false },
+                    { name: '🛡️ المشرف المسؤول', value: executor, inline: false }
+                )
+                .setTimestamp();
+            logChannel.send({ embeds: [embed] });
+        });
+    }
 });
 
 client.login(process.env.TOKEN);
