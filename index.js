@@ -16,7 +16,7 @@ const CHANNELS = {
     MODERATION: '763446019119251466',
     MUTE_VOICE: '763446086819774484',
     MESSAGES:   '763421646836858891',
-    CHANNELS:   '763445919130583091',
+    CHANNELS:   '763445919130583091', // روم الرومات (القنوات الكتابية والحركة الصوتية)
     ROLES:      '763444458565009460'
 };
 
@@ -64,9 +64,9 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
     logChannel.send({ embeds: [embed] });
 });
 
-// 2. الحركة الصوتية والميوت مع جلب المشرف المسؤول
+// 2. الحركة الصوتية (تم نقلها إلى روم الرومات CHANNELS)
 client.on('voiceStateUpdate', async (oldState, newState) => {
-    const logChannel = newState.guild.channels.cache.get(CHANNELS.MUTE_VOICE);
+    const logChannel = newState.guild.channels.cache.get(CHANNELS.CHANNELS);
     if (!logChannel) return;
 
     const member = newState.member;
@@ -99,6 +99,15 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 
         return logChannel.send({ embeds: [embed] });
     }
+});
+
+// 3. الميوت والدفن الصوتي (تبقى في روم الميوت MUTE_VOICE)
+client.on('voiceStateUpdate', async (oldState, newState) => {
+    const logChannel = newState.guild.channels.cache.get(CHANNELS.MUTE_VOICE);
+    if (!logChannel) return;
+
+    const member = newState.member;
+    if (!member) return;
 
     if (oldState.serverMute !== newState.serverMute || oldState.serverDeaf !== newState.serverDeaf) {
         let status = '';
@@ -137,7 +146,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     }
 });
 
-// 3. العقوبات الإدارية (Kick, Ban)
+// 4. العقوبات الإدارية (Kick, Ban)
 client.on('guildAuditLogEntryCreate', async (auditLog, guild) => {
     try {
         const { action, executor, target } = auditLog;
@@ -174,7 +183,7 @@ client.on('guildAuditLogEntryCreate', async (auditLog, guild) => {
     }
 });
 
-// 4. الرومات
+// 5. الرومات الكتابية
 client.on('channelCreate', async (channel) => {
     const logChannel = channel.guild.channels.cache.get(CHANNELS.CHANNELS);
     if (!logChannel) return;
@@ -234,7 +243,7 @@ client.on('channelDelete', async (channel) => {
     logChannel.send({ embeds: [embed] });
 });
 
-// 5. الرولات (إنشاء، حذف، إعطاء رتبة، سحب رتبة)
+// 6. الرولات
 client.on('roleCreate', async (role) => {
     const logChannel = role.guild.channels.cache.get(CHANNELS.ROLES);
     if (!logChannel) return;
@@ -293,7 +302,6 @@ client.on('roleDelete', async (role) => {
     logChannel.send({ embeds: [embed] });
 });
 
-// تتبع إعطاء وسحب الرولات للأعضاء
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
     const logChannel = newMember.guild.channels.cache.get(CHANNELS.ROLES);
     if (!logChannel) return;
@@ -301,9 +309,7 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
     const oldRoles = oldMember.roles.cache;
     const newRoles = newMember.roles.cache;
 
-    // التحقق من الرتب المضافة (إعطاء رتبة)
     const addedRoles = newRoles.filter(role => !oldRoles.has(role.id));
-    // التحقق من الرتب المسحوبة (سحب رتبة)
     const removedRoles = oldRoles.filter(role => !newRoles.has(role.id));
 
     if (addedRoles.size > 0 || removedRoles.size > 0) {
