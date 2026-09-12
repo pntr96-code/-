@@ -64,7 +64,7 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
     logChannel.send({ embeds: [embed] });
 });
 
-// 2. الحركة الصوتية مع منشن المسؤول عن النقل بدقة
+// 2. الحركة الصوتية
 client.on('voiceStateUpdate', async (oldState, newState) => {
     const logChannel = newState.guild.channels.cache.get(CHANNELS.CHANNELS);
     if (!logChannel) return;
@@ -93,8 +93,8 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
                     type: AuditLogEvent.MemberMove,
                 });
                 const auditLog = fetchedLogs.entries.first();
-                if (auditLog && auditLog.target.id === member.id && (Date.now() - auditLog.createdTimestamp < 4000)) {
-                    if (auditLog.executor.id !== member.id) {
+                if (auditLog && auditLog.target && auditLog.target.id === member.id && (Date.now() - auditLog.createdTimestamp < 4000)) {
+                    if (auditLog.executor && auditLog.executor.id !== member.id) {
                         movedBy = `<@${auditLog.executor.id}>`;
                     }
                 }
@@ -141,7 +141,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
                 type: AuditLogEvent.MemberUpdate,
             });
             const auditLog = fetchedLogs.entries.first();
-            if (auditLog && auditLog.target.id === member.id) {
+            if (auditLog && auditLog.target && auditLog.target.id === member.id && auditLog.executor) {
                 executor = `<@${auditLog.executor.id}>`;
             }
         } catch (e) {
@@ -212,7 +212,7 @@ client.on('channelCreate', async (channel) => {
             type: AuditLogEvent.ChannelCreate,
         });
         const auditLog = fetchedLogs.entries.first();
-        if (auditLog) {
+        if (auditLog && auditLog.executor) {
             executor = `<@${auditLog.executor.id}>`;
         }
     } catch (e) {
@@ -242,7 +242,7 @@ client.on('channelDelete', async (channel) => {
             type: AuditLogEvent.ChannelDelete,
         });
         const auditLog = fetchedLogs.entries.first();
-        if (auditLog) {
+        if (auditLog && auditLog.executor) {
             executor = `<@${auditLog.executor.id}>`;
         }
     } catch (e) {
@@ -272,7 +272,7 @@ client.on('roleCreate', async (role) => {
             type: AuditLogEvent.RoleCreate,
         });
         const auditLog = fetchedLogs.entries.first();
-        if (auditLog) {
+        if (auditLog && auditLog.executor) {
             executor = `<@${auditLog.executor.id}>`;
         }
     } catch (e) {
@@ -301,7 +301,7 @@ client.on('roleDelete', async (role) => {
             type: AuditLogEvent.RoleDelete,
         });
         const auditLog = fetchedLogs.entries.first();
-        if (auditLog) {
+        if (auditLog && auditLog.executor) {
             executor = `<@${auditLog.executor.id}>`;
         }
     } catch (e) {
@@ -337,7 +337,7 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
                 type: AuditLogEvent.MemberRoleUpdate,
             });
             const auditLog = fetchedLogs.entries.first();
-            if (auditLog && auditLog.target.id === newMember.id) {
+            if (auditLog && auditLog.target && auditLog.target.id === newMember.id && auditLog.executor) {
                 executor = `<@${auditLog.executor.id}>`;
             }
         } catch (e) {
