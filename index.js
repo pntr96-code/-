@@ -64,7 +64,7 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
     logChannel.send({ embeds: [embed] });
 });
 
-// 2. الحركة الصوتية مع التمييز الدقيق بين الانتقال الذاتي والسحب بواسطة مشرف
+// 2. الحركة الصوتية مع منشن المسؤول عن النقل بدقة
 client.on('voiceStateUpdate', async (oldState, newState) => {
     const logChannel = newState.guild.channels.cache.get(CHANNELS.CHANNELS);
     if (!logChannel) return;
@@ -95,7 +95,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
                 const auditLog = fetchedLogs.entries.first();
                 if (auditLog && auditLog.target.id === member.id && (Date.now() - auditLog.createdTimestamp < 4000)) {
                     if (auditLog.executor.id !== member.id) {
-                        movedBy = `${auditLog.executor.tag} (<@${auditLog.executor.id}>)`;
+                        movedBy = `<@${auditLog.executor.id}>`;
                     }
                 }
             } catch (e) {
@@ -142,7 +142,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
             });
             const auditLog = fetchedLogs.entries.first();
             if (auditLog && auditLog.target.id === member.id) {
-                executor = `${auditLog.executor.tag} (<@${auditLog.executor.id}>)`;
+                executor = `<@${auditLog.executor.id}>`;
             }
         } catch (e) {
             console.error(e);
@@ -177,7 +177,7 @@ client.on('guildAuditLogEntryCreate', async (auditLog, guild) => {
                 .setThumbnail(target.displayAvatarURL({ dynamic: true }))
                 .addFields(
                     { name: '👤 العضو المطرود', value: `${target.tag} (<@${target.id}>)`, inline: false },
-                    { name: '🛡️ المشرف المسؤول', value: `${executor ? `${executor.tag} (<@${executor.id}>)` : 'غير معروف'}`, inline: false }
+                    { name: '🛡️ المشرف المسؤول', value: `${executor ? `<@${executor.id}>` : 'غير معروف'}`, inline: false }
                 )
                 .setTimestamp();
             return logChannel.send({ embeds: [embed] });
@@ -190,7 +190,7 @@ client.on('guildAuditLogEntryCreate', async (auditLog, guild) => {
                 .setThumbnail(target.displayAvatarURL({ dynamic: true }))
                 .addFields(
                     { name: '👤 العضو المحظور', value: `${target.tag} (<@${target.id}>)`, inline: false },
-                    { name: '🛡️ المشرف المسؤول', value: `${executor ? `${executor.tag} (<@${executor.id}>)` : 'غير معروف'}`, inline: false }
+                    { name: '🛡️ المشرف المسؤول', value: `${executor ? `<@${executor.id}>` : 'غير معروف'}`, inline: false }
                 )
                 .setTimestamp();
             return logChannel.send({ embeds: [embed] });
@@ -213,7 +213,7 @@ client.on('channelCreate', async (channel) => {
         });
         const auditLog = fetchedLogs.entries.first();
         if (auditLog) {
-            executor = `${auditLog.executor.tag} (<@${auditLog.executor.id}>)`;
+            executor = `<@${auditLog.executor.id}>`;
         }
     } catch (e) {
         console.error(e);
@@ -243,7 +243,7 @@ client.on('channelDelete', async (channel) => {
         });
         const auditLog = fetchedLogs.entries.first();
         if (auditLog) {
-            executor = `${auditLog.executor.tag} (<@${auditLog.executor.id}>)`;
+            executor = `<@${auditLog.executor.id}>`;
         }
     } catch (e) {
         console.error(e);
@@ -273,7 +273,7 @@ client.on('roleCreate', async (role) => {
         });
         const auditLog = fetchedLogs.entries.first();
         if (auditLog) {
-            executor = `${auditLog.executor.tag} (<@${auditLog.executor.id}>)`;
+            executor = `<@${auditLog.executor.id}>`;
         }
     } catch (e) {
         console.error(e);
@@ -302,7 +302,7 @@ client.on('roleDelete', async (role) => {
         });
         const auditLog = fetchedLogs.entries.first();
         if (auditLog) {
-            executor = `${auditLog.executor.tag} (<@${auditLog.executor.id}>)`;
+            executor = `<@${auditLog.executor.id}>`;
         }
     } catch (e) {
         console.error(e);
@@ -338,7 +338,7 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
             });
             const auditLog = fetchedLogs.entries.first();
             if (auditLog && auditLog.target.id === newMember.id) {
-                executor = `${auditLog.executor.tag} (<@${auditLog.executor.id}>)`;
+                executor = `<@${auditLog.executor.id}>`;
             }
         } catch (e) {
             console.error(e);
