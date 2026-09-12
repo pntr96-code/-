@@ -16,7 +16,7 @@ const CHANNELS = {
     MODERATION: '763446019119251466',
     MUTE_VOICE: '763446086819774484',
     MESSAGES:   '763421646836858891',
-    CHANNELS:   '763445919130583091', // روم الرومات (القنوات الكتابية والحركة الصوتية)
+    CHANNELS:   '763445919130583091',
     ROLES:      '763444458565009460'
 };
 
@@ -64,7 +64,7 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
     logChannel.send({ embeds: [embed] });
 });
 
-// 2. الحركة الصوتية (تم نقلها إلى روم الرومات CHANNELS)
+// 2. الحركة الصوتية (الانضمام، المغادرة، النقل بواسطة مشرف)
 client.on('voiceStateUpdate', async (oldState, newState) => {
     const logChannel = newState.guild.channels.cache.get(CHANNELS.CHANNELS);
     if (!logChannel) return;
@@ -75,6 +75,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     if (oldState.channelId !== newState.channelId) {
         let actionText = '';
         let color = '#3498DB';
+        let movedBy = 'نفسه (انتقل بنفسه)';
 
         if (!oldState.channelId && newState.channelId) {
             actionText = `انضم إلى الروم الصوتي: ${newState.channel.name}`;
@@ -85,6 +86,20 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
         } else if (oldState.channelId && newState.channelId) {
             actionText = `انتقل من روم ${oldState.channel.name} إلى ${newState.channel.name}`;
             color = '#F39C12';
+
+            // التحقق عما إذا كان مشرف آخر قد قام بسحبه
+            try {
+                const fetchedLogs = await newState.guild.fetchAuditLogs({
+                    limit: 1,
+                    type: AuditLogEvent.MemberMove,
+                });
+                const auditLog = fetchedLogs.entries.first();
+                if (auditLog && auditLog.target.id === member.id && (Date.now() - auditLog.createdTimestamp < 3000)) {
+                    movedBy = `${auditLog.executor.tag} (<@${auditLog.executor.id}>)`;
+                }
+            } catch (e) {
+                console.error(e);
+            }
         }
 
         const embed = new EmbedBuilder()
@@ -93,7 +108,8 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
             .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
             .addFields(
                 { name: '👤 العضو', value: `${member.user.tag} (<@${member.id}>)`, inline: false },
-                { name: '📍 التفاصيل', value: actionText, inline: false }
+                { name: '📍 التفاصيل', value: actionText, inline: false },
+                { name: '🛡️ المسؤول عن النقل', value: movedBy, inline: false }
             )
             .setTimestamp();
 
